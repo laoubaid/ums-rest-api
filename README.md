@@ -122,16 +122,16 @@ repo
 ### User Table
 Stores user account information including credentials and profile data.
 
-   ![User Table Schema](imgs/user.png)
+   ![User Table Schema](imgs/UMS_user.png)
 
 ### PasswordReset Table
 Manages password reset tokens and their expiration times for secure password recovery.
 
-   ![Password Reset Table Schema](imgs/passwordReset.png)
+   ![Password Reset Table Schema](imgs/UMS_passwordReset.png)
 
 ## API Documentation
    
-![API Endpoints](imgs/swagger.png)
+![API Endpoints](imgs/UMS_swagger.png)
 
 The API is fully documented using OpenAPI 3.0 specification. You can:
 
