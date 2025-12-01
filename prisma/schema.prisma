@@ -1,0 +1,32 @@
+// This is Prisma schema file
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "sqlite"
+    url      = env("DATABASE_URL")  //NOTE: url needed because this project is using prisma 6.19.0
+}
+
+model User {
+    id        Int      @id @default(autoincrement())
+    username  String   @unique
+    email     String   @unique
+    password  String
+    role      String   @default("user")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    passwordResets PasswordReset[]
+}
+
+// password reset token table
+model PasswordReset {
+    id        Int      @id @default(autoincrement())
+    token     String   @unique
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
