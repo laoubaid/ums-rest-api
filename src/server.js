@@ -40,7 +40,7 @@ server.get('/health', async (request, reply) => {
 
 // launching server on localhost
 server.listen({
-    port: 3000, 
+    port: process.env.PORT, 
     host: '127.0.0.1'
 })
 

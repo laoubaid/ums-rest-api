@@ -1,3 +1,4 @@
 JWT_SEC=example_key_for_testing
 DATABASE_URL="file:./prisma/usermgmt.db"
+PORT=3000
 
