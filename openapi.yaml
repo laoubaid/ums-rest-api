@@ -1,22 +1,41 @@
 openapi: 3.0.0
 info:
-  title: User Management API
-  description: REST API for user authentication and management with role-based access control
-  version: 1.0.0
+  title: User Management System API
+  description: |
+    A comprehensive REST API for user authentication and management with role-based access control.
+    
+    ## Features
+    - JWT-based authentication with HTTP-only cookies
+    - GitHub OAuth integration
+    - Password reset via email
+    - Role-based access control (User/Admin)
+    - Secure password hashing with bcrypt
+    
+    ## Authentication
+    This API supports two authentication methods:
+    1. **JWT Bearer Token**: Include the token in the Authorization header
+    2. **HTTP-only Cookie**: Automatically set after login/OAuth
+    
+  version: 2.0.0
   contact:
     name: API Support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
 
 servers:
   - url: http://localhost:3000/api
     description: Development server
+  - url: http://127.0.0.1:3000/api
+    description: Local development server
 
 tags:
   - name: Authentication
-    description: User authentication endpoints
+    description: User authentication and OAuth endpoints
   - name: Users
-    description: User management endpoints
+    description: User profile management endpoints
   - name: Admin
-    description: Admin-only endpoints
+    description: Admin-only user management endpoints
 
 components:
   securitySchemes:
@@ -25,6 +44,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT token obtained from login endpoint
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: authToken
+      description: HTTP-only cookie set automatically after login
 
   schemas:
     User:
@@ -32,23 +56,32 @@ components:
       properties:
         id:
           type: integer
-          description: User ID
+          description: Unique user identifier
+          example: 1
         username:
           type: string
-          description: Username
+          description: Username (4-16 characters)
+          minLength: 4
+          maxLength: 16
+          example: johndoe
         email:
           type: string
           format: email
-          description: User email
+          description: User email address
+          example: john@example.com
         role:
           type: string
           enum: [user, admin]
-          description: User role
-      example:
-        id: 1
-        username: johndoe
-        email: john@example.com
-        role: user
+          description: User role for access control
+          example: user
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
 
     LoginRequest:
       type: object
@@ -58,14 +91,26 @@ components:
       properties:
         username:
           type: string
-          description: Username
+          description: Username or email
+          example: johndoe
         password:
           type: string
           format: password
           description: User password
-      example:
-        username: johndoe
-        password: password123
+          example: password123
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Login successful
+        token:
+          type: string
+          description: JWT token (expires in 7 days)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/User'
 
     RegisterRequest:
       type: object
@@ -76,20 +121,30 @@ components:
       properties:
         username:
           type: string
-          description: Username
+          minLength: 4
+          maxLength: 16
+          description: Unique username (4-16 characters)
+          example: johndoe
         email:
           type: string
           format: email
-          description: User email
+          description: Valid email address
+          example: john@example.com
         password:
           type: string
           format: password
           minLength: 4
-          description: User password (minimum 4 characters)
-      example:
-        username: johndoe
-        email: john@example.com
-        password: password123
+          description: Password (minimum 4 characters, use 8+ in production)
+          example: password123
+
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: User created successfully
+        user:
+          $ref: '#/components/schemas/User'
 
     UpdateProfileRequest:
       type: object
@@ -98,14 +153,13 @@ components:
           type: string
           format: email
           description: New email address
+          example: newemail@example.com
         password:
           type: string
           format: password
           minLength: 4
           description: New password (minimum 4 characters)
-      example:
-        email: newemail@example.com
-        password: newpassword123
+          example: newpassword123
 
     UpdateUserRequest:
       type: object
@@ -114,18 +168,18 @@ components:
           type: string
           format: email
           description: New email address
+          example: newemail@example.com
         password:
           type: string
           format: password
           minLength: 4
           description: New password (minimum 4 characters)
+          example: newpassword123
         role:
           type: string
           enum: [user, admin]
-          description: New user role
-      example:
-        email: newemail@example.com
-        role: admin
+          description: New user role (admin only)
+          example: admin
 
     ForgotPasswordRequest:
       type: object
@@ -135,27 +189,36 @@ components:
         email:
           type: string
           format: email
-          description: User's email address
-      example:
-        email: john@example.com
+          description: Email address associated with the account
+          example: john@example.com
+
+    ForgotPasswordResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Password reset email sent successfully
+        devToken:
+          type: string
+          description: Reset token (DEVELOPMENT ONLY - remove in production)
+          example: abc123xyz789
 
     ResetPasswordRequest:
       type: object
       required:
         - token
-        - newPassword
+        - password
       properties:
         token:
           type: string
           description: Password reset token received via email
-        newPassword:
+          example: abc123xyz789
+        password:
           type: string
           format: password
           minLength: 4
           description: New password (minimum 4 characters)
-      example:
-        token: abc123xyz789
-        newPassword: newSecurePassword123
+          example: newSecurePassword123
 
     Error:
       type: object
@@ -163,8 +226,7 @@ components:
         error:
           type: string
           description: Error message
-      example:
-        error: Invalid username or password
+          example: Invalid username or password
 
     Success:
       type: object
@@ -172,8 +234,7 @@ components:
         message:
           type: string
           description: Success message
-      example:
-        message: Operation completed successfully
+          example: Operation completed successfully
 
 paths:
   /auth/login:
@@ -181,7 +242,10 @@ paths:
       tags:
         - Authentication
       summary: Login user
-      description: Authenticate user with username and password, returns JWT token
+      description: |
+        Authenticate user with username and password. Returns a JWT token and sets an HTTP-only cookie.
+        The token expires in 7 days.
+      operationId: loginUser
       requestBody:
         required: true
         content:
@@ -191,19 +255,16 @@ paths:
       responses:
         '200':
           description: Login successful
+          headers:
+            Set-Cookie:
+              description: HTTP-only authentication cookie
+              schema:
+                type: string
+                example: authToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Login successful
-                  token:
-                    type: string
-                    description: JWT token (expires in 15 minutes)
-                  user:
-                    $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/LoginResponse'
         '400':
           description: Missing credentials
           content:
@@ -219,7 +280,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Invalid username or password
+                error: Invalid username or password!
         '500':
           description: Internal server error
           content:
@@ -232,7 +293,8 @@ paths:
       tags:
         - Authentication
       summary: Register new user
-      description: Create a new user account
+      description: Create a new user account with username, email, and password
+      operationId: registerUser
       requestBody:
         required: true
         content:
@@ -245,15 +307,9 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: User registered successfully
-                  user:
-                    $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/RegisterResponse'
         '400':
-          description: Invalid input or user already exists
+          description: Invalid input
           content:
             application/json:
               schema:
@@ -264,19 +320,216 @@ paths:
                     error: username, email and password are required
                 shortPassword:
                   value:
-                    error: Password must be at least 4 characters
-                userExists:
+                    error: password must be at least 4 characters long
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: User already exists
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Clear authentication cookie and invalidate session
+      operationId: logoutUser
+      responses:
+        '200':
+          description: Logout successful
+          headers:
+            Set-Cookie:
+              description: Clears the authentication cookie
+              schema:
+                type: string
+                example: authToken=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logout successful. Token invalidated.
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: |
+        Send a password reset token to the user's email address.
+        Always returns success for security (doesn't reveal if email exists).
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Reset email sent (or email doesn't exist - security measure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordResponse'
+        '400':
+          description: Missing email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: email is required
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password with token
+      description: Reset user password using the token received via email
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset successfully
+        '400':
+          description: Invalid input or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingFields:
                   value:
-                    error: Username or email already exists
+                    error: token and password are required
+                shortPassword:
+                  value:
+                    error: password must be at least 4 characters long
+                invalidToken:
+                  value:
+                    error: Invalid or expired token
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/github:
+    get:
+      tags:
+        - Authentication
+      summary: Initiate GitHub OAuth
+      description: |
+        Redirects to GitHub OAuth authorization page.
+        After authorization, GitHub redirects back to /auth/github/callback.
+      operationId: githubLogin
+      responses:
+        '302':
+          description: Redirect to GitHub OAuth
+          headers:
+            Location:
+              description: GitHub OAuth authorization URL
+              schema:
+                type: string
+                example: https://github.com/login/oauth/authorize?client_id=...
+
+  /auth/github/callback:
+    get:
+      tags:
+        - Authentication
+      summary: GitHub OAuth callback
+      description: |
+        Handles the OAuth callback from GitHub, exchanges the code for an access token,
+        retrieves user information, creates or finds the user in the database,
+        generates a JWT token, and redirects to the frontend.
+      operationId: githubCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Authorization code from GitHub
+          schema:
+            type: string
+      responses:
+        '303':
+          description: Redirect to frontend with authentication cookie set
+          headers:
+            Set-Cookie:
+              description: HTTP-only authentication cookie
+              schema:
+                type: string
+                example: authToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800
+            Location:
+              description: Frontend profile URL
+              schema:
+                type: string
+                example: https://localhost:5000/profile
+        '400':
+          description: Missing authorization code or GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                noCode:
+                  value:
+                    error: Authorization code not provided
+                githubError:
+                  value:
+                    error: GitHub authentication failed
+                noToken:
+                  value:
+                    error: No access token received
+        '500':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Authentication failed
 
   /users:
     get:
       tags:
         - Admin
       summary: Get all users
-      description: Retrieve all users (Admin only)
+      description: Retrieve a list of all users (Admin only)
+      operationId: getAllUsers
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: List of all users
@@ -301,161 +554,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /users/{id}:
-    get:
-      tags:
-        - Admin
-      summary: Get user by ID
-      description: Retrieve a specific user by ID (Admin only)
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: User ID
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: User found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  user:
-                    $ref: '#/components/schemas/User'
-        '401':
-          description: Unauthorized - Invalid or missing token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Forbidden - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: User not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
               example:
-                error: User not Found
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    put:
-      tags:
-        - Admin
-      summary: Update user by ID
-      description: Update any user's profile (Admin only)
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: User ID
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
-      responses:
-        '200':
-          description: Profile updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Profile updated successfully
-                  user:
-                    $ref: '#/components/schemas/User'
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                missingFields:
-                  value:
-                    error: Provide email or password to update
-                updateFailed:
-                  value:
-                    error: Email already exists or update failed
-        '401':
-          description: Unauthorized - Invalid or missing token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Forbidden - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    delete:
-      tags:
-        - Admin
-      summary: Delete user by ID
-      description: Delete any user account (Admin only)
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: User ID
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Account deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Account deleted successfully
-        '401':
-          description: Unauthorized - Invalid or missing token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Forbidden - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+                error: Admin access required
         '500':
           description: Internal server error
           content:
@@ -468,12 +568,14 @@ paths:
       tags:
         - Users
       summary: Get current user profile
-      description: Retrieve logged-in user's profile
+      description: Retrieve the authenticated user's profile information
+      operationId: getCurrentUser
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
-          description: User profile retrieved
+          description: User profile retrieved successfully
           content:
             application/json:
               schema:
@@ -494,7 +596,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: User not Found
+                error: User not found
         '500':
           description: Internal server error
           content:
@@ -506,9 +608,11 @@ paths:
       tags:
         - Users
       summary: Update current user profile
-      description: Update logged-in user's email or password
+      description: Update the authenticated user's email or password
+      operationId: updateCurrentUser
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -537,10 +641,7 @@ paths:
               examples:
                 missingFields:
                   value:
-                    error: Provide email or password to update
-                shortPassword:
-                  value:
-                    error: Password must be at least 4 characters
+                    error: Provide email to update
                 updateFailed:
                   value:
                     error: Email already exists or update failed
@@ -555,9 +656,11 @@ paths:
       tags:
         - Users
       summary: Delete current user account
-      description: Delete logged-in user's account
+      description: Permanently delete the authenticated user's account
+      operationId: deleteCurrentUser
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Account deleted successfully
@@ -582,40 +685,65 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/forgot-password:
-    post:
+  /users/{id}:
+    get:
       tags:
-        - Authentication
-      summary: Request password reset
-      description: Send password reset token to user's email
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
+        - Admin
+      summary: Get user by ID
+      description: Retrieve a specific user's information by ID (Admin only)
+      operationId: getUserById
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
       responses:
         '200':
-          description: Reset link sent (always returns success for security)
+          description: User found
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-                    example: A reset link has been sent
-                  devToken:
-                    type: string
-                    description: Token for development only (remove in production)
+                  user:
+                    $ref: '#/components/schemas/User'
         '400':
-          description: Missing email
+          description: Invalid user ID
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Email is required!
+                error: Invalid user ID
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Admin access required
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: User not found
         '500':
           description: Internal server error
           content:
@@ -623,21 +751,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/reset-password:
-    post:
+    put:
       tags:
-        - Authentication
-      summary: Reset password with token
-      description: Reset user password using the token received via email
+        - Admin
+      summary: Update user by ID
+      description: Update any user's profile including role (Admin only)
+      operationId: updateUserById
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: '#/components/schemas/UpdateUserRequest'
       responses:
         '200':
-          description: Password reset successfully
+          description: Profile updated successfully
           content:
             application/json:
               schema:
@@ -645,9 +785,11 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Password reset successfully
+                    example: Profile updated successfully
+                  user:
+                    $ref: '#/components/schemas/User'
         '400':
-          description: Invalid input or expired token
+          description: Invalid input
           content:
             application/json:
               schema:
@@ -655,19 +797,78 @@ paths:
               examples:
                 missingFields:
                   value:
-                    error: Token and new password are required
-                shortPassword:
+                    error: Provide email to update
+                invalidId:
                   value:
-                    error: Password must be at least 6 characters
-                invalidToken:
+                    error: Invalid user ID
+                updateFailed:
                   value:
-                    error: Invalid or expired token
-        '500':
-          description: Server error
+                    error: Email already exists or update failed
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Admin
+      summary: Delete user by ID
+      description: Permanently delete any user account (Admin only)
+      operationId: deleteUserById
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Account deleted successfully
+        '400':
+          description: Invalid user ID
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Server error            
-                  
+                error: Invalid user ID
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
