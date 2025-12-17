@@ -354,40 +354,6 @@ curl -X GET http://localhost:3000/api/users/me \
 2. Set up environment variables for your base URL and token
 3. Test all endpoints with the interactive interface
 
-## 🚀 Deployment Recommendations
-
-### Production Checklist
-
-- [ ] Change `JWT_SECRET` to a strong random string (32+ characters)
-- [ ] Change `COOKIE_SECRET` to a strong random string
-- [ ] Update password minimum length to 8+ characters
-- [ ] Remove `devToken` from forgot-password response
-- [ ] Set `NODE_ENV=production`
-- [ ] Use a production database (PostgreSQL, MySQL)
-- [ ] Enable HTTPS/SSL certificates
-- [ ] Configure proper CORS origins
-- [ ] Set up rate limiting
-- [ ] Implement request logging
-- [ ] Add monitoring and error tracking
-- [ ] Set up automated backups
-- [ ] Review and update security headers
-
-### Environment Variables for Production
-
-```env
-NODE_ENV=production
-DATABASE_URL=postgresql://user:password@host:5432/dbname
-JWT_SECRET=<strong-random-string-min-32-chars>
-COOKIE_SECRET=<strong-random-string-min-32-chars>
-FRONTEND_URL=https://yourdomain.com
-```
-
-## 📝 API Versioning
-
-Current API version: **v2.0.0**
-
-The API follows semantic versioning. Breaking changes will increment the major version.
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -401,29 +367,6 @@ Contributions are welcome! Please follow these steps:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🐛 Known Issues & Limitations
-
-- Password reset tokens are stored in the database (consider Redis for production)
-- SQLite is used for development (migrate to PostgreSQL/MySQL for production)
-- No rate limiting implemented (add in production)
-- Session management is stateless (consider Redis for session storage)
-
-## 🔮 Future Enhancements
-
-- [ ] Add refresh token mechanism
-- [ ] Implement rate limiting
-- [ ] Add email verification on registration
-- [ ] Support for multiple OAuth providers (Google, Facebook)
-- [ ] Two-factor authentication (2FA)
-- [ ] User activity logging
-- [ ] Password strength meter
-- [ ] Account lockout after failed attempts
-- [ ] API versioning in routes
-- [ ] WebSocket support for real-time updates
-- [ ] Comprehensive test suite
-- [ ] Docker containerization
-- [ ] CI/CD pipeline
 
 ## 📞 Support
 
@@ -441,4 +384,3 @@ For issues, questions, or contributions:
 
 ---
 
-**Built with ❤️ using TypeScript and Fastify**
