@@ -1,6 +1,7 @@
 
 import 'fastify';
 import { JWTPayload } from './auth.types';
+import { FastifyJWT } from '@fastify/jwt';
 
 declare module 'fastify' {
     interface FastifyRequest {
@@ -12,5 +13,14 @@ declare module 'fastify' {
         // The utility types here ensure correctness
         register: FastifyPluginAsync<{}> extends FastifyPluginAsync<FastifyCookieOptions> ? FastifyPluginAsync<FastifyCookieOptions> : never;
         cookie: FastifyCookie;
+        authenticate: FastifyPluginAsync<{}> extends FastifyPluginAsync<FastifyCookieOptions> ? FastifyPluginAsync<FastifyCookieOptions> : never;
+        authenticate2FA: FastifyPluginAsync<{}> extends FastifyPluginAsync<FastifyCookieOptions> ? FastifyPluginAsync<FastifyCookieOptions> : never;
+    }
+}
+
+declare module '@fastify/jwt' {
+    interface FastifyJWT {
+        payload: JWTPayload;
+        user: JWTPayload;
     }
 }

@@ -1,15 +1,10 @@
 
+// import type { userRoles } from "./user.types.ts";
+
 export interface JWTPayload {
-    // 1. Custom Data (from your signing object)
     userId: number;
     username: string;
-    role: string; // Use union types if roles are fixed
-
-    // 2. Standard Claims (added by the { expiresIn: '7d' } option)
-    // Issued At (time token was created)
-    // iat: number;
-    // // Expiration Time (time token expires)
-    // exp: number;
+    requires2FA: boolean;
 }
 
 export interface PasswordResetToken {
@@ -40,10 +35,13 @@ export interface UserAuthData {
     id: number;
     username: string;
     email: string;
-    role: string;
     avatar: string;
     githubId: string;
     password?: string;
+    twoFactor?: {
+        method: string | null;
+        totpSecret: string | null;
+    } | null;
     createdAt: Date;
     updatedAt: Date;
 }

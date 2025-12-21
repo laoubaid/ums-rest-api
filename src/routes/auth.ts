@@ -1,10 +1,10 @@
 
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { LoginInput, RegisterInput, JWTPayload, CreateUserInput, PasswordResetInput, GithubProfile } from '../types';
-import { createPasswordResetToken, createUser, deletePasswordResetToken, findOrCreateGithubUser, findPasswordResetToken, getUserByUsername, getUserForAuth, updateUser } from '../db';
-import { sendPasswordResetEmail } from '../services/email.js';
+import { createPasswordResetToken, createUser, deletePasswordResetToken, deleteTwoFactorCode, findOrCreateGithubUser, findPasswordResetToken, findTwoFactorCode, generateTwoFactorCode, getUserByUsername, getUserForAuth, updateUser } from '../db';
+import { send2faEmailCode, sendPasswordResetEmail } from '../services/email.js';
+import speakeasy from 'speakeasy';
 
 const LoginSchema = {
     body: {
@@ -26,6 +26,13 @@ const RegisterSchema = {
             email: { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 4, maxLength: 16 }  // also change in production
         }
+    }
+} as const;
+
+export const StrictRateLimit = {
+    rateLimit: {
+        max: 5,
+        timeWindow: '1 minute'
     }
 } as const;
 
@@ -76,6 +83,7 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
     server.post<{
         Body: LoginInput
     }>('/login', {
+        config: StrictRateLimit, // more strict rate limit for login 5/min 
         schema: LoginSchema
     }, async (request, reply) => {
 
@@ -104,14 +112,10 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
         const payload: JWTPayload = {
             userId: user.id,
             username: user.username,
-            role: user.role
+            requires2FA: user.twoFactor ? true : false
         }
 
-        const jwToken = jwt.sign(
-            payload,
-            process.env.JWT_SEC,
-            { expiresIn: '7d' } // 7 days short term token
-        );
+        const jwToken = server.jwt.sign(payload, { expiresIn: '7d' });
 
         reply.setCookie('authToken', jwToken, {
             httpOnly: true,
@@ -121,14 +125,24 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
+        if (user.twoFactor) {
+            const code = await generateTwoFactorCode(user.id);
+            await send2faEmailCode(user.email, code);
+
+            return reply.send({
+                message: 'need to verify 2FA, code sent to your email',
+                requires2FA: true,
+                devCode: code,
+                expiresIn: '10 minutes'
+            });
+        }
+
         return reply.send({
             message: 'Login successful',
-            token: jwToken,
             user: {   // use interface later
                 id: user.id,
                 username: user.username,
-                email: user.email,
-                role: user.role
+                email: user.email
             }
         });
     });
@@ -137,6 +151,7 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
     server.post<{
         Body: RegisterInput
     }>('/register', {
+        config: StrictRateLimit,
         schema: RegisterSchema
     }, async (request, reply) => {
         const { username, email, password } = request.body;
@@ -152,8 +167,7 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
         const newUser: CreateUserInput = {
             username,
             email,
-            password,
-            role: 'user'
+            password
         }
 
 
@@ -219,7 +233,6 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
                 message: "Password reset email sent successfully"
             })
         } catch (error) {
-            console.error(error);
             return reply.code(500).send({ error: "Internal server error" });
         }
     });
@@ -330,20 +343,16 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
             const payload: JWTPayload = {
                 userId: user.id,
                 username: user.username,
-                role: user.role as 'user' | 'admin'
+                requires2FA: user.twoFactor ? true : false
             };
 
-            const jwToken = jwt.sign(
-                payload,
-                process.env.JWT_SEC as string,
-                { expiresIn: '7d' }
-            );
+            const jwToken = server.jwt.sign(payload, { expiresIn: '7d' });
 
             // Set authentication cookie
             reply.setCookie('authToken', jwToken, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
+                secure: true, // change to -> process.env.NODE_ENV === 'production',
+                sameSite: 'none',  // change for more secure approach
                 path: '/',
                 maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
             });
@@ -355,6 +364,79 @@ export default async function authRoutes(server: FastifyInstance): Promise<void>
             console.error('[GitHub OAuth error]:', err);
             return reply.code(500).send({ error: 'Authentication failed' });
         }
+    });
+
+    // 2fa verification
+    server.post<{
+        Body: { code: string }
+    }>('/login/verify', {
+        config: StrictRateLimit,
+        preHandler: [server.authenticate2FA]
+    }, async (request, reply) => {
+
+        const { code } = request.body;
+
+        if (!code) {
+            return reply.code(400).send({ error: 'Code is required' });
+        }
+
+        const userId = request.user.userId;
+
+        if (!userId) {
+            return reply.code(400).send({ error: 'User ID is required' });
+        }
+
+        const user = await getUserForAuth(request.user.username);
+
+        if (!user) {
+            return reply.code(404).send({ error: 'User not found' });
+        }
+
+        if (user.twoFactor.method === 'email') {
+            const isValidCode = await findTwoFactorCode(code);
+
+            if (!isValidCode || isValidCode.code !== code) {
+                return reply.code(401).send({ error: 'Invalid code' });
+            }
+
+            await deleteTwoFactorCode(userId);
+        } else if (user.twoFactor.method === 'totp') {
+            const isValid = speakeasy.totp.verify({
+                secret: user.twoFactor.totpSecret,
+                encoding: 'base32',
+                token: code,
+                window: 2
+            });
+            if (!isValid) {
+                return reply.code(401).send({ error: 'Invalid code' });
+            }
+        }
+
+        const payload: JWTPayload = {
+            userId: user.id,
+            username: user.username,
+            requires2FA: false
+        };
+
+        const jwToken = server.jwt.sign(payload, { expiresIn: '7d' });
+
+        reply.setCookie('authToken', jwToken, {
+            httpOnly: true,
+            secure: true, // change to -> process.env.NODE_ENV === 'production',
+            sameSite: 'none',  // change for more secure approach
+            path: '/',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
+        return reply.send({
+            message: '2FA verified successfully',
+            user: {   // use interface later
+                id: user.id,
+                username: user.username,
+                requires2FA: false
+            }
+        });
+
     });
 
 }

@@ -1,22 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "outDir": "./dist",
     "rootDir": "./src",
     "sourceMap": true,
     "esModuleInterop": true,
-    "isolatedModules": true,
-    // FOR MIGRATION
+    "isolatedModules": true, // Critical for SWC/tsup to work correctly
+    // KEEP THESE RELAXED FOR MIGRATION
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
+    // KEEP THESE GOOD PRACTICES
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-
+    // JS INTEROP
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "allowJs": true,

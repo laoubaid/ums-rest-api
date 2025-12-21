@@ -1,5 +1,5 @@
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, TwoFactorCode, UserTwoFactor } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 import { UserData, CreateUserInput, UpdateUserInput, PasswordResetToken } from "./types";
@@ -8,7 +8,7 @@ import type { GithubProfile, UserAuthData } from "./types/auth.types.js";
 const prisma = new PrismaClient();
 
 export async function createUser(input: CreateUserInput): Promise<UserData> {
-    const { username, email, password, role = 'user' } = input;
+    const { username, email, password } = input;
 
     const hash = await bcrypt.hash(password, 10);
 
@@ -16,15 +16,18 @@ export async function createUser(input: CreateUserInput): Promise<UserData> {
         data: {
             username,
             email,
-            password: hash,
-            role
+            password: hash
         },
         select: {
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -40,8 +43,12 @@ export async function getAllUsers(): Promise<UserData[]> {
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -58,8 +65,12 @@ export async function getUserById(id: number): Promise<UserData | null> {
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -81,8 +92,12 @@ export async function getUserByUsername(usernameOrEmail: string): Promise<UserDa
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -99,8 +114,13 @@ export async function getUserForAuth(username: string): Promise<UserAuthData> {
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true,
+                    totpSecret: true
+                }
+            },
             githubId: true,
             password: true,
             createdAt: true,
@@ -111,14 +131,12 @@ export async function getUserForAuth(username: string): Promise<UserAuthData> {
 }
 
 export async function updateUser(id: number, updates: UpdateUserInput): Promise<UserData | null> {
-    const data: Partial<UserData> = {}; // this makes every property optional
+    const data: any = {}; // this makes every property optional
 
     if (updates.email !== undefined) {
         data.email = updates.email;
     }
-    if (updates.role !== undefined) {
-        data.role = updates.role;
-    }
+
     if (updates.password !== undefined) {
         const hash = await bcrypt.hash(updates.password, 10);
         data.password = hash;
@@ -131,8 +149,12 @@ export async function updateUser(id: number, updates: UpdateUserInput): Promise<
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -150,8 +172,12 @@ export async function deleteUser(id: number): Promise<UserData | null> {
             id: true,
             username: true,
             email: true,
-            role: true,
             avatar: true,
+            twoFactor: {
+                select: {
+                    method: true
+                }
+            },
             githubId: true,
             createdAt: true,
             updatedAt: true
@@ -163,10 +189,10 @@ export async function deleteUser(id: number): Promise<UserData | null> {
 
 export async function findOrCreateGithubUser(profile: GithubProfile): Promise<UserData> {
 
-    const githubIdString = String(profile.id);
+    const gitHubUserId = profile.id.toString();
 
     let user = await prisma.user.findUnique({
-        where: { githubId: githubIdString }
+        where: { githubId: gitHubUserId }
     })
 
     if (user) {
@@ -190,9 +216,9 @@ export async function findOrCreateGithubUser(profile: GithubProfile): Promise<Us
     user = await prisma.user.create({
         data: {
             username: profile.login + counter,
-            email: profile.email || `${profile.login + counter}@github.noreply.local`,
+            email: profile.email || `${profile.login}@github.com`,
             avatar: profile.avatar_url,
-            githubId: githubIdString
+            githubId: gitHubUserId
         }
     })
 
@@ -203,9 +229,7 @@ export async function createPasswordResetToken(userId: number): Promise<Password
     const token = (await import('crypto')).randomBytes(12).toString('hex');
 
     const expiresAt = new Date();
-
-
-    expiresAt.setHours(expiresAt.getHours() + 24 * 7); // 7 days access token
+    expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
 
     const resetToken = await prisma.passwordReset.create({
         data: {
@@ -239,25 +263,116 @@ export async function findPasswordResetToken(token: string): Promise<PasswordRes
     return resetToken;
 }
 
+export async function findTwoFactorCode(userCode: string): Promise<TwoFactorCode | null> {
+    const code = await prisma.twoFactorCode.findFirst({
+        where: { code: userCode }
+    });
+
+    if (!code) {
+        console.error('\x1b[31m%s\x1b[0m', "No 2FA code found for user");
+        return null;
+    }
+
+    if (code.expiresAt < new Date()) {
+        console.error('\x1b[31m%s\x1b[0m', "2FA code expired for user");
+        await prisma.twoFactorCode.delete({
+            where: { id: code.id }
+        });
+        return null;
+    }
+
+    console.log('2FA code found for user ', "code: ", code.code);
+    return code;
+}
+
+export async function updateTwoFactor(userId: number): Promise<UserTwoFactor> {
+    const twoFactor = await prisma.userTwoFactor.update({
+        where: { userId },
+        data: { enabled: true }
+    });
+    return twoFactor;
+}
+
 export async function deletePasswordResetToken(token: string): Promise<void> {
     await prisma.passwordReset.delete({
         where: { token }
     })
 }
 
+
+
+
+
+export async function createTwoFactor(userId: number, secret: string | null) {
+    // 2. Save 2FA config (disabled by default)
+
+    if (secret) {
+        await prisma.userTwoFactor.create({
+            data: {
+                userId,
+                method: 'totp',
+                totpSecret: secret
+            }
+        });
+    } else {
+        await prisma.userTwoFactor.create({
+            data: {
+                userId,
+                method: 'email'
+            }
+        });
+    }
+}
+
+export async function deleteTwoFactor(userId: number) {
+    await prisma.userTwoFactor.delete({
+        where: { userId }
+    });
+}
+
+
+export async function generateTwoFactorCode(userId: number) {
+    // 1. Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // 2. Save verification code
+    await prisma.twoFactorCode.create({
+        data: {
+            userId,
+            code,
+            expiresAt
+        }
+    });
+
+    return code;
+}
+
+export async function deleteTwoFactorCode(userId: number) {
+    await prisma.twoFactorCode.deleteMany({
+        where: { userId }
+    });
+}
+
+
+
+
+
+
+
+
 /////// Temporary ///////
-export async function createAdminIfNeeded() {
-    let user = await getUserByUsername('admin')
+export async function createTestUserIfNeeded() {
+    let user = await getUserByUsername('test')
 
     if (!user) {
         user = await createUser({
-            username: 'admin',
-            email: 'admin@test.com',
-            password: 'admin',
-            role: 'admin'
+            username: 'test',
+            email: 'test@test.com',
+            password: 'test'
         })
         if (user)
-            console.log("\x1b[32m%s\x1b[0m", 'Admin user created: username=admin, password=admin')
+            console.log("\x1b[32m%s\x1b[0m", 'Test user created: username=test, password=test')
     }
 }
 

@@ -1,10 +1,9 @@
 // This is your Prisma schema file
 
 generator client {
-    provider        = "prisma-client-js"
+    provider = "prisma-client-js"
     // TypeScript-specific options
-    output          = "../node_modules/.prisma/client"
-    previewFeatures = ["fullTextSearch"]
+    output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -17,24 +16,64 @@ model User {
     username String  @unique
     email    String  @unique
     password String? // optional (nullable)
-    role     String  @default("user")
 
     // OAuth fields
     githubId String? @unique
-    avatar   String? //  (profile picture)
+    avatar   String? @default("/default-avatar.png")
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
     passwordResets PasswordReset[]
+
+    // 2FA fields
+    twoFactor      UserTwoFactor?
+    twoFactorCodes TwoFactorCode[]
+    refreshTokens  RefreshToken[]
 }
 
 // password reset token table
 model PasswordReset {
-    id        Int      @id @default(autoincrement())
+    id     Int  @id @default(autoincrement())
+    userId Int
+    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
     token     String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
+
+// refresh token table
+model RefreshToken {
+    id        Int      @id @default(autoincrement())
     userId    Int
     user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    token     String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
+
+// 2fa config table
+model UserTwoFactor {
+    id     Int  @id @default(autoincrement())
+    userId Int  @unique // one config per user
+    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    method     String? // totp or email, never both
+    enabled    Boolean @default(false)
+    totpSecret String? // need to be encrypted, totp only
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+// email 2fa code table
+model TwoFactorCode {
+    id     Int  @id @default(autoincrement())
+    userId Int
+    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    code      String
     expiresAt DateTime
     createdAt DateTime @default(now())
 }
