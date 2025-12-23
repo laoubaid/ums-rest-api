@@ -1,6 +1,7 @@
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { JWTPayload } from '../types';
+import { env } from '../env';
 
 export async function verifyToken(req: FastifyRequest, resp: FastifyReply): Promise<void> {
     try {
@@ -12,7 +13,7 @@ export async function verifyToken(req: FastifyRequest, resp: FastifyReply): Prom
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SEC as string) as JWTPayload;
+        const decoded = jwt.verify(token, env.JWT_SEC as string) as JWTPayload;
 
         if (decoded.requires2FA) {
             return resp.code(403).send({
@@ -58,7 +59,7 @@ export async function verify2FAToken(req: FastifyRequest, resp: FastifyReply): P
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SEC as string) as JWTPayload;
+        const decoded = jwt.verify(token, env.JWT_SEC as string) as JWTPayload;
 
         req.user = decoded;
     } catch (error) {

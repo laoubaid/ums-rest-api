@@ -1,5 +1,5 @@
 .env
 *.db
-src/generated/
-node_modules/
-package-lock.json
+backend/src/generated/
+*/node_modules/
+*/package-lock.json

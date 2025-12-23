@@ -1,22 +1,23 @@
 import nodemailer from 'nodemailer'
+import { env } from '../env';
 
 // Create transporter (email sender)
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT),
+    host: env.EMAIL_HOST,
+    port: parseInt(env.EMAIL_PORT),
     secure: false, // true for 465, false for other ports
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: env.EMAIL_USER,
+        pass: env.EMAIL_PASS
     }
 })
 
 // Send password reset email
 async function sendPasswordResetEmail(email, token, username) {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`
+    const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`
 
     const mailOptions = {
-        from: process.env.EMAIL_FROM,
+        from: env.EMAIL_FROM,
         to: email,
         subject: 'Password Reset Request',
         html: `
@@ -96,7 +97,7 @@ async function sendPasswordResetEmail(email, token, username) {
     console.log('Password reset email sent:', info.messageId)
 
     // For Ethereal, log the preview URL
-    if (process.env.EMAIL_HOST === 'smtp.ethereal.email') {
+    if (env.EMAIL_HOST === 'smtp.ethereal.email') {
         console.log('Preview URL:', nodemailer.getTestMessageUrl(info))
     }
 
@@ -105,7 +106,7 @@ async function sendPasswordResetEmail(email, token, username) {
 
 async function send2faEmailCode(email, code) {
     const mailOptions = {
-        from: process.env.EMAIL_FROM,
+        from: env.EMAIL_FROM,
         to: email,
         subject: '2FA Code',
         text: `Your 2FA code is: ${code}`
@@ -116,7 +117,7 @@ async function send2faEmailCode(email, code) {
     console.log('2FA code email sent:', info.messageId)
 
     // For Ethereal, log the preview URL
-    if (process.env.EMAIL_HOST === 'smtp.ethereal.email') {
+    if (env.EMAIL_HOST === 'smtp.ethereal.email') {
         console.log('Preview URL:', nodemailer.getTestMessageUrl(info))
     }
 

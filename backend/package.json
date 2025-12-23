@@ -34,7 +34,8 @@
     "prisma": "6.19.0",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@swc/cli": "^0.7.9",

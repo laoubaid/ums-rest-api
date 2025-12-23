@@ -5,6 +5,7 @@ export interface JWTPayload {
     userId: number;
     username: string;
     requires2FA: boolean;
+    type: string;
 }
 
 export interface PasswordResetToken {

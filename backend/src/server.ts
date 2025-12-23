@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import Fastify from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
@@ -10,6 +9,7 @@ import authRoutes from './routes/auth';
 import { createTestUserIfNeeded } from './db';
 import { testEmailConnection } from './services/email';
 import twoFactorRoutes from './routes/2fa';
+import { env } from './env';
 
 const fastifyServer = Fastify({
     logger: true,
@@ -18,8 +18,7 @@ const fastifyServer = Fastify({
 async function startServer(): Promise<void> {
     try {
         await fastifyServer.register(fastifyCookie, {
-            // IMPORTANT: Use a strong, unique secret from environment variables in a real app
-            secret: process.env.COOKIE_SECRET || "super-secure-default-secret-key-12345"
+            secret: env.COOKIE_SECRET
         });
 
         await fastifyServer.register(import('@fastify/rate-limit'), {
@@ -34,7 +33,7 @@ async function startServer(): Promise<void> {
         await testEmailConnection();
 
         await fastifyServer.register(jwt, {
-            secret: process.env.JWT_SEC,
+            secret: env.JWT_SEC,
             cookie: {
                 cookieName: 'authToken', // Tell it where to find the token
                 signed: false
@@ -81,7 +80,7 @@ async function startServer(): Promise<void> {
         // the following code is a fix for the options request check for Cross Origin Resource Sharing
         // Register CORS 
         await fastifyServer.register(cors, {
-            origin: [process.env.FRONTEND_URL],   // diffrent host is needed for 127.0.0.1
+            origin: [env.FRONTEND_URL],   // diffrent host is needed for 127.0.0.1
             credentials: true,  // for siting cookies to work 
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
         });
@@ -99,7 +98,7 @@ async function startServer(): Promise<void> {
         // register end;
 
         await fastifyServer.listen({
-            port: Number(process.env.PORT) || 3000,
+            port: Number(env.PORT),
             host: '127.0.0.1'
         });
 

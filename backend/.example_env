@@ -1,4 +1,5 @@
 JWT_SEC=example_key_for_testing
+COOKIE_SECRET=example_key_for_testing
 DATABASE_URL="file:./usermgmt.db"
 PORT=3000
 

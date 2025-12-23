@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 
 import { UserData, CreateUserInput, UpdateUserInput, PasswordResetToken } from "./types";
 import type { GithubProfile, UserAuthData } from "./types/auth.types.js";
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -226,7 +227,7 @@ export async function findOrCreateGithubUser(profile: GithubProfile): Promise<Us
 }
 
 export async function createPasswordResetToken(userId: number): Promise<PasswordResetToken> {
-    const token = (await import('crypto')).randomBytes(12).toString('hex');
+    const token = crypto.randomBytes(12).toString('hex');
 
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
@@ -299,9 +300,31 @@ export async function deletePasswordResetToken(token: string): Promise<void> {
     })
 }
 
+export async function saveRefreshToken(userId: number, refreshToken: string) {
+    await prisma.refreshToken.create({
+        data: {
+            userId,
+            token: refreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        }
+    })
+}
 
+export async function getUserByRefreshToken(token: string): Promise<UserData | null> {
+    const refreshToken = await prisma.refreshToken.findUnique({
+        where: { token }
+    });
 
+    if (!refreshToken) {
+        return null;
+    }
 
+    const user = await prisma.user.findUnique({
+        where: { id: refreshToken.userId }
+    });
+
+    return user;
+}
 
 export async function createTwoFactor(userId: number, secret: string | null) {
     // 2. Save 2FA config (disabled by default)
@@ -333,7 +356,7 @@ export async function deleteTwoFactor(userId: number) {
 
 export async function generateTwoFactorCode(userId: number) {
     // 1. Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // 2. Save verification code
