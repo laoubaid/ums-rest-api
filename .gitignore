@@ -2,3 +2,4 @@
 *.db
 backend/src/generated/
 */node_modules/
+.vscode

@@ -98,7 +98,7 @@ async function startServer(): Promise<void> {
         // register end;
 
         await fastifyServer.listen({
-            port: Number(env.PORT),
+            port: Number(env.PORT | 3000),
             host: '127.0.0.1'
         });
 
