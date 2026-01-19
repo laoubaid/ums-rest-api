@@ -47,3 +47,19 @@ export interface UserAuthData {
     updatedAt: Date;
 }
 
+export interface UserTwoFactor {
+    id: number;
+    userId: number;
+    method: string | null;
+    totpSecret: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface TwoFactorCode {
+    id: number;
+    userId: number;
+    code: string;
+    expiresAt: Date;
+    createdAt: Date;
+}

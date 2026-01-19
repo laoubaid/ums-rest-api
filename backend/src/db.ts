@@ -1,9 +1,9 @@
 
-import { PrismaClient, TwoFactorCode, UserTwoFactor } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 import { UserData, CreateUserInput, UpdateUserInput, PasswordResetToken } from "./types";
-import type { GithubProfile, UserAuthData } from "./types/auth.types.js";
+import type { GithubProfile, TwoFactorCode, UserAuthData, UserTwoFactor } from "./types/auth.types.js";
 import crypto from 'crypto';
 
 const prisma = new PrismaClient();
